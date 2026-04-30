@@ -20,10 +20,14 @@ public class TwoStatePreference extends Preference {
     }
 
     @JsonIgnore
-    public boolean isChecked() { throw new RuntimeException("Stub!"); }
+    public boolean isChecked() {
+        return (Boolean) getCurrentValue();
+    }
 
     @JsonIgnore
-    public void setChecked(boolean checked) { throw new RuntimeException("Stub!"); }
+    public void setChecked(boolean checked) {
+        callChangeListener(checked);
+    }
 
     @JsonIgnore
     public CharSequence getSummaryOn() {
