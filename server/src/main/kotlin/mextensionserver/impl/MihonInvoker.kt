@@ -29,6 +29,7 @@ import mextensionserver.model.DataBody
 import mextensionserver.model.EpisodeData
 import mextensionserver.model.JAnime
 import mextensionserver.model.JFilterList
+import mextensionserver.model.JGroupFilter
 import mextensionserver.model.JManga
 import mextensionserver.model.JPage
 import mextensionserver.model.MangaData
@@ -658,6 +659,31 @@ object MihonInvoker {
         return FilterList(convertedFilters)
     }
 
+    private fun applyAnimeGroupFilterState(
+        state: Any,
+        dataGroup: JGroupFilter,
+    ) {
+        val simpleName = state.javaClass.simpleName
+        val stateValue: Any? =
+            when (simpleName) {
+                "CheckBox", "CheckBoxVal" -> dataGroup.stateBoolean ?: false
+                "TriState" -> dataGroup.stateInt ?: 0
+                "Select", "QueryPartFilter", "SortFilter" -> dataGroup.stateInt ?: 0
+                "Text" -> dataGroup.name ?: ""
+                else -> null
+            }
+        if (stateValue == null) {
+            return
+        }
+        try {
+            val field = state.javaClass.getDeclaredField("state")
+            field.isAccessible = true
+            field.set(state, stateValue)
+        } catch (_: NoSuchFieldException) {
+            // Obfuscated or unknown filter type — skip silently
+        }
+    }
+
     private fun convertAnimeFilterList(
         originalFilters: AnimeFilterList,
         jFilters: List<JFilterList>,
@@ -702,32 +728,24 @@ object MihonInvoker {
                         filter
                     }
                     is AnimeFilter.Group<*> -> {
-                        val groupFilter = filter as AnimeFilter.Group<Filter<*>>
+                        val groupFilter = filter as AnimeFilter.Group<*>
                         val jGroup = jFilters.find { it.name == groupFilter.name }
                         if (jGroup != null) {
                             val subJFilters = jGroup.stateList
-                            for (state in groupFilter.state) {
-                                val jSubFilter = subJFilters?.find { it.name == state.name }
-                                val dataGroup = jSubFilter
-                                if (dataGroup == null) {
-                                    continue
-                                }
-                                if (state is AnimeFilter.CheckBox) {
-                                    val checkBox = state
-                                    checkBox.state = dataGroup.stateBoolean ?: false
-                                }
-                                if (state is AnimeFilter.TriState) {
-                                    val checkBox = state
-                                    checkBox.state = dataGroup.stateInt ?: 0
-                                }
-                                if (state is AnimeFilter.Select<*>) {
-                                    val select = state
-                                    select.state = dataGroup.stateInt ?: 0
-                                }
-                                if (state is AnimeFilter.Text) {
-                                    val text = state
-                                    text.state = dataGroup.name ?: ""
-                                }
+                            for (child in groupFilter.state) {
+                                if (child == null) continue
+                                val childName =
+                                    when (child) {
+                                        is AnimeFilter<*> -> child.name
+                                        else ->
+                                            try {
+                                                child.javaClass.getDeclaredField("name").apply { isAccessible = true }.get(child) as? String
+                                            } catch (_: Exception) {
+                                                null
+                                            }
+                                    } ?: continue
+                                val dataGroup = subJFilters?.find { it.name == childName } ?: continue
+                                applyAnimeGroupFilterState(child, dataGroup)
                             }
                         }
                         filter
