@@ -5,6 +5,8 @@ data class DataBody(
     val method: String,
     val page: Int? = null,
     val search: String? = null,
+    val baseUrl: String? = null,
+    val lang: String? = null,
     val filterList: List<JFilterList>? = null,
     val mangaData: MangaData? = null,
     val chapterData: ChapterData? = null,

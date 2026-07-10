@@ -40,12 +40,16 @@ object MExtensionServerLoader {
     }
 
     data class LoadedExtension(
-        val sources: List<Any>,
+        val source: Any,
         val packageInfo: PackageInfo,
         val jarFile: File,
     )
 
-    fun loadExtensionFromBase64(base64Data: String): LoadedExtension {
+    fun loadExtensionFromBase64(
+        base64Data: String,
+        baseUrl: String? = null,
+        lang: String? = null,
+    ): LoadedExtension {
         val apkData = Base64.getDecoder().decode(base64Data)
         val tempApkFile = File(tempDir, "extension-${UUID.randomUUID()}.apk")
         val apkName = tempApkFile.name
@@ -93,7 +97,11 @@ object MExtensionServerLoader {
                     else -> throw RuntimeException("Unknown source class type! ${extensionMainClassInstance.javaClass}")
                 }
 
-            return LoadedExtension(sources, packageInfo, jarFile)
+            val selectedSource =
+                selectSource(sources, baseUrl, lang)
+                    ?: throw IllegalArgumentException("No matching source found in extension")
+
+            return LoadedExtension(selectedSource, packageInfo, jarFile)
         } catch (e: Exception) {
             logger.error(e) { "Failed to load extension from base64 data" }
             throw e
@@ -103,6 +111,35 @@ object MExtensionServerLoader {
                 tempApkFile.delete()
             }
         }
+    }
+
+    private fun selectSource(
+        sources: List<Any>,
+        baseUrl: String?,
+        lang: String?,
+    ): Any? {
+        if (sources.isEmpty()) return null
+        if (!baseUrl.isNullOrBlank()) {
+            sources.firstOrNull { source ->
+                try {
+                    val url = source.javaClass.getMethod("getBaseUrl").invoke(source) as String
+                    url == baseUrl || url.trimEnd('/') == baseUrl.trimEnd('/')
+                } catch (_: Exception) {
+                    false
+                }
+            }?.let { return it }
+        }
+        if (!lang.isNullOrBlank()) {
+            sources.firstOrNull { source ->
+                try {
+                    val sourceLang = source.javaClass.getMethod("getLang").invoke(source) as String
+                    sourceLang.equals(lang, ignoreCase = true)
+                } catch (_: Exception) {
+                    false
+                }
+            }?.let { return it }
+        }
+        return sources.firstOrNull()
     }
 
     fun cleanupTempFiles() {

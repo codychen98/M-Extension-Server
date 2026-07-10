@@ -26,11 +26,16 @@ class DalvikHandler {
             val dataBody = objectMapper.readValue(json, DataBody::class.java)
 
             // Load extension
-            val loadedExtension = MExtensionServerLoader.loadExtensionFromBase64(dataBody.data)
+            val loadedExtension =
+                MExtensionServerLoader.loadExtensionFromBase64(
+                    dataBody.data,
+                    dataBody.baseUrl,
+                    dataBody.lang,
+                )
 
             // Get domain from source
             val domain =
-                loadedExtension.sources.firstOrNull()?.let { source ->
+                loadedExtension.source.let { source ->
                     try {
                         val baseUrl = source.javaClass.getMethod("getBaseUrl").invoke(source) as String
                         java.net.URI(baseUrl).host
@@ -58,7 +63,7 @@ class DalvikHandler {
                         }
                     }?.toList()
             val network =
-                loadedExtension.sources.firstOrNull()?.let { source ->
+                loadedExtension.source.let { source ->
                     when (source) {
                         is HttpSource -> source.network
                         is AnimeHttpSource -> source.network

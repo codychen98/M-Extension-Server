@@ -47,9 +47,7 @@ object MihonInvoker {
         loadedExtension: MExtensionServerLoader.LoadedExtension,
         data: DataBody,
     ): Any {
-        val source =
-            loadedExtension.sources.firstOrNull()
-                ?: throw IllegalArgumentException("No sources found in extension")
+        val source = loadedExtension.source
 
         applyPreferences(data, source)
 
