@@ -8,6 +8,7 @@ package mextensionserver
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+import android.os.Looper
 import eu.kanade.tachiyomi.App
 import io.github.oshai.kotlinlogging.KotlinLogging
 import mextensionserver.controller.MExtensionServerController
@@ -19,10 +20,15 @@ import xyz.nulldev.androidcompat.AndroidCompatInitializer
 import xyz.nulldev.ts.config.ConfigKodeinModule
 import java.net.CookieHandler
 import java.net.CookieManager
+import java.util.concurrent.CompletableFuture
 import javax.swing.SwingUtilities
 
 private val logger = KotlinLogging.logger {}
 private val androidCompat by lazy { AndroidCompat() }
+private val applicationInitLock = Any()
+
+@Volatile
+private var applicationInitialized = false
 
 @Suppress("BlockingMethodInNonBlockingContext")
 fun main(args: Array<String>) {
@@ -37,7 +43,6 @@ fun main(args: Array<String>) {
         System.setProperty("apple.laf.useScreenMenuBar", "true")
     }
 
-    CookieHandler.setDefault(CookieManager())
     initApplication(appDir)
 
     if (useUI) {
@@ -55,16 +60,47 @@ fun main(args: Array<String>) {
     }
 }
 
-private fun initApplication(appDir: String?) {
-    logger.info("Running MExtensionServer ${BuildConfig.VERSION} revision ${BuildConfig.REVISION}")
+internal fun initApplication(appDir: String?) {
+    synchronized(applicationInitLock) {
+        if (applicationInitialized) return
 
-    // Set custom app directory if provided
-    appDir?.let { System.setProperty("ts.server.rootDir", it) }
+        logger.info("Running MExtensionServer ${BuildConfig.VERSION} revision ${BuildConfig.REVISION}")
 
-    // Load config API
-    DI.global.addImport(ConfigKodeinModule().create())
-    // Load Android compatibility dependencies
-    AndroidCompatInitializer().init()
-    // start app
-    androidCompat.startApp(App())
+        // Set custom app directory if provided
+        appDir?.let { System.setProperty("ts.server.rootDir", it) }
+        CookieHandler.setDefault(CookieManager())
+
+        startMainLooper()
+
+        // Load config API
+        DI.global.addImport(ConfigKodeinModule().create())
+        // Load Android compatibility dependencies
+        AndroidCompatInitializer().init()
+        // start app
+        androidCompat.startApp(App())
+        applicationInitialized = true
+    }
+}
+
+private fun startMainLooper() {
+    if (Looper.getMainLooper() != null) return
+
+    val ready = CompletableFuture<Unit>()
+    Thread(
+        {
+            try {
+                Looper.prepareMainLooper()
+                ready.complete(Unit)
+                Looper.loop()
+            } catch (error: Throwable) {
+                ready.completeExceptionally(error)
+                logger.error(error) { "Android main looper stopped" }
+            }
+        },
+        "Android main looper",
+    ).apply {
+        isDaemon = true
+        start()
+    }
+    ready.join()
 }
