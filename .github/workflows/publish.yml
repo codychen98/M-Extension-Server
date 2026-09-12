@@ -24,9 +24,29 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v5
 
+  test:
+    name: Unit tests
+    needs: check_wrapper
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Generate android.jar
+        run: ./AndroidCompat/getAndroid.sh
+
+      - name: Run server unit tests
+        run: ./gradlew :server:test --no-daemon --stacktrace
+
   build-macos:
     name: Build macOS (.dmg)
-    needs: check_wrapper
+    needs: [check_wrapper, test]
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -56,7 +76,7 @@ jobs:
 
   build-windows:
     name: Build Windows (.zip + .exe)
-    needs: check_wrapper
+    needs: [check_wrapper, test]
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -92,7 +112,7 @@ jobs:
 
   build-linux:
     name: Build Linux (.tar.gz + deb + AppImage)
-    needs: check_wrapper
+    needs: [check_wrapper, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -131,7 +151,7 @@ jobs:
 
   build-jar:
     name: Build Jar
-    needs: check_wrapper
+    needs: [check_wrapper, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

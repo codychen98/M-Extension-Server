@@ -16,6 +16,7 @@ class NetworkHelperTest {
         assertTrue("UncaughtExceptionInterceptor" in interceptors)
         assertTrue("UserAgentInterceptor" in interceptors)
         assertTrue("CloudflareInterceptor" in interceptors)
+        assertTrue("MegaplaySourcesInterceptor" in interceptors)
         assertFalse("MangaFireProtectionInterceptor" in interceptors)
         assertFalse(
             networkInterceptors.any {
