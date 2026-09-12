@@ -38,13 +38,16 @@ class VideoCompatTest {
 
     @Test
     fun `copy with 15 params exists`() {
+        // Include synthetic: Kotlin may mark the HIDDEN 14-param overload synthetic
+        // when both copy overloads use default parameters.
         val copyMethods =
             Video::class.java.declaredMethods.filter { method ->
-                method.name == "copy" && !method.isSynthetic
+                method.name == "copy"
             }
+        val summary = copyMethods.joinToString { "${it.parameterCount}/synthetic=${it.isSynthetic}" }
 
-        assertTrue(copyMethods.any { it.parameterCount == 15 }, "expected 15-param copy")
-        assertTrue(copyMethods.any { it.parameterCount == 14 }, "expected ext-lib-16 HIDDEN 14-param copy")
+        assertTrue(copyMethods.any { it.parameterCount == 15 }, "expected 15-param copy; found=$summary")
+        assertTrue(copyMethods.any { it.parameterCount == 14 }, "expected ext-lib-16 HIDDEN 14-param copy; found=$summary")
     }
 
     @Test
