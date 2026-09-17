@@ -224,6 +224,43 @@ class MegaplaySourcesInterceptorTest {
         assertEquals("""{"enc":"whatever"}""", response.body!!.string())
     }
 
+    @Test
+    fun `interceptor rewrites enc on primary getSources so requiresProxy stays false`() {
+        val fileUrl = "https://ncdn.example/master.m3u8"
+        val enc = encryptEnc("""{"file":"$fileUrl"}""", key, iv)
+        val encBody = """{"t":1,"server":4,"enc":"$enc"}"""
+
+        val client =
+            OkHttpClient
+                .Builder()
+                .addInterceptor(MegaplaySourcesInterceptor(key, iv))
+                .addInterceptor { chain ->
+                    Response
+                        .Builder()
+                        .request(chain.request())
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(200)
+                        .message("OK")
+                        .body(encBody.toResponseBody("application/json".toMediaType()))
+                        .build()
+                }.build()
+
+        val response =
+            client
+                .newCall(
+                    Request
+                        .Builder()
+                        .url("https://megaplay.buzz/stream/getSources?id=1&type=sub")
+                        .header("Referer", "https://megaplay.buzz/stream/s-2/609644/sub?s=tcdn")
+                        .build(),
+                ).execute()
+
+        val body = response.body!!.string()
+        val obj = Json.parseToJsonElement(body).jsonObject
+        assertEquals(fileUrl, obj["sources"]!!.jsonObject["file"]!!.jsonPrimitive.content)
+        assertFalse(obj.containsKey("enc"))
+    }
+
     private fun encryptEnc(
         plain: String,
         key: ByteArray,

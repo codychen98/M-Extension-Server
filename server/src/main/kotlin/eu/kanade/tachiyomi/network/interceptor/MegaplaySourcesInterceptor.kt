@@ -27,8 +27,13 @@ private val jsonParser = Json { ignoreUnknownKeys = true }
  * Megaplay CDN selector + enc decrypt for Anikoto / megaplay.buzz.
  *
  * (a) Copies `s` from the request Referer onto `/stream/getSources*` when missing.
- * (b) Rewrites `/stream/getSourcesNew` JSON that has `enc` and no `sources` into
+ * (b) Rewrites any `/stream/getSources*` JSON that has `enc` and no `sources` into
  * `{"sources":{"file":...}, ...}` so the extension DTO parses.
+ *
+ * Decrypting the **primary** `getSources` response (not only `getSourcesNew`) matters for the
+ * hoster-list API path: Anikoto no longer calls `ensureM3u8ServerRunning()` before extract, so
+ * `usedGetSourcesNew=true` → `requiresProxy=true` silently drops every video. Making primary
+ * parse succeed keeps `requiresProxy=false` and lets [MihonVideoProxy] serve the CDN URL.
  */
 class MegaplaySourcesInterceptor(
     private val key: ByteArray = defaultKey(),
@@ -37,7 +42,7 @@ class MegaplaySourcesInterceptor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = withCdnSelector(chain.request())
         val response = chain.proceed(request)
-        return if (isGetSourcesNew(request.url)) rewriteEnc(response) else response
+        return if (isAllowedMegaplayUrl(request.url)) rewriteEnc(response) else response
     }
 
     private fun rewriteEnc(response: Response): Response {

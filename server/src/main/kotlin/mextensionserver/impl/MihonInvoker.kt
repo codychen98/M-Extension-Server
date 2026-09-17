@@ -683,12 +683,28 @@ object MihonInvoker {
                 .getHosterList(episode)
                 .let { source.run { it.sortHosters() } }
 
+        logger.info {
+            "[BRIDGE] flattenHosterVideos source=${source.name} hosters=${hosters.size}"
+        }
+
         val videos = mutableListOf<Video>()
         for (hoster in hosters) {
             val hosterVideos =
                 hoster.videoList
-                    ?: runCatching { source.getVideoList(hoster) }.getOrDefault(emptyList())
+                    ?: runCatching { source.getVideoList(hoster) }
+                        .onFailure { e ->
+                            logger.warn(e) {
+                                "[BRIDGE] getVideoList(hoster) failed " +
+                                    "source=${source.name} hoster=${hoster.hosterName}: ${e.message}"
+                            }
+                        }.getOrDefault(emptyList())
+            logger.info {
+                "[BRIDGE] hoster=${hoster.hosterName} videos=${hosterVideos.size}"
+            }
             videos.addAll(source.run { hosterVideos.sortVideos() })
+        }
+        logger.info {
+            "[BRIDGE] flattenHosterVideos done source=${source.name} totalVideos=${videos.size}"
         }
         return videos
     }
