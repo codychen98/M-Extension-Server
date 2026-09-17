@@ -51,6 +51,32 @@ class VideoCompatTest {
     }
 
     @Test
+    fun `ext-lib-16 copy default synthetic exists for named-arg calls`() {
+        // Anikoto calls video.copy(videoTitle=..., timestamps=...) which binds to
+        // copy$default without memo (14 value params + mask + marker).
+        val defaults =
+            Video::class.java.declaredMethods.filter { method ->
+                method.name == "copy\$default"
+            }
+        val summary =
+            defaults.joinToString { m ->
+                m.parameterTypes.joinToString(prefix = "${m.parameterCount}:", separator = ",") { it.simpleName }
+            }
+
+        assertTrue(
+            defaults.any { method ->
+                val types = method.parameterTypes
+                // receiver Video, 14 args, int mask, Object marker — no JsonObject
+                types.size == 17 &&
+                    types[0] == Video::class.java &&
+                    types[15] == Int::class.javaPrimitiveType &&
+                    types.none { it.simpleName == "JsonObject" }
+            },
+            "expected 14-param copy\$default (no memo); found=$summary",
+        )
+    }
+
+    @Test
     fun `jackson still emits quality url and videoUrl`() {
         val video = Video(url = "https://example.com/page", quality = "1080p", videoUrl = "https://cdn/stream.m3u8")
         val json = jacksonObjectMapper().writeValueAsString(video)
