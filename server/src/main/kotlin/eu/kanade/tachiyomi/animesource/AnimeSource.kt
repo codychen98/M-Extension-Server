@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.animesource
 
+import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
@@ -53,6 +54,20 @@ interface AnimeSource {
      */
     @Suppress("DEPRECATION")
     suspend fun getVideoList(episode: SEpisode): List<Video> = fetchVideoList(episode).awaitSingle()
+
+    /**
+     * Get the list of hosters for an episode.
+     *
+     * @since extensions-lib 16
+     */
+    suspend fun getHosterList(episode: SEpisode): List<Hoster> = throw IllegalStateException("Not used")
+
+    /**
+     * Get the list of videos for a hoster.
+     *
+     * @since extensions-lib 16
+     */
+    suspend fun getVideoList(hoster: Hoster): List<Video> = throw IllegalStateException("Not used")
 
     @Deprecated(
         "Use the non-RxJava API instead",

@@ -626,7 +626,13 @@ object MihonInvoker {
         }
 
         return runBlocking {
-            val videos = source.getVideoList(episodeData.toSEpisode())
+            val episode = episodeData.toSEpisode()
+            val videos =
+                if (sourceSupportsHosters(source)) {
+                    flattenHosterVideos(source, episode)
+                } else {
+                    source.getVideoList(episode)
+                }
             videos.map { video ->
                 val resolvedVideo =
                     if (video.videoUrl.isNullOrEmpty() || video.status == Video.LOAD_VIDEO) {
@@ -643,6 +649,48 @@ object MihonInvoker {
                 MihonVideoProxy.proxy(source, resolvedVideo)
             }
         }
+    }
+
+    /**
+     * Aniyomi EpisodeLoader-compatible detection: true when a concrete extension
+     * declares getHosterList / hosterListRequest / hosterListParse below AnimeHttpSource.
+     */
+    private fun sourceSupportsHosters(source: AnimeHttpSource): Boolean {
+        var current: Class<*> = source.javaClass
+        while (true) {
+            if (current == AnimeHttpSource::class.java ||
+                current.name == "eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource" ||
+                current.name == "eu.kanade.tachiyomi.animesource.AnimeSource"
+            ) {
+                return false
+            }
+            if (current.declaredMethods.any {
+                    it.name in listOf("getHosterList", "hosterListRequest", "hosterListParse")
+                }
+            ) {
+                return true
+            }
+            current = current.superclass ?: return false
+        }
+    }
+
+    private suspend fun flattenHosterVideos(
+        source: AnimeHttpSource,
+        episode: SEpisode,
+    ): List<Video> {
+        val hosters =
+            source
+                .getHosterList(episode)
+                .let { source.run { it.sortHosters() } }
+
+        val videos = mutableListOf<Video>()
+        for (hoster in hosters) {
+            val hosterVideos =
+                hoster.videoList
+                    ?: runCatching { source.getVideoList(hoster) }.getOrDefault(emptyList())
+            videos.addAll(source.run { hosterVideos.sortVideos() })
+        }
+        return videos
     }
 
     private fun MangaData.toSManga(source: Source): SManga =

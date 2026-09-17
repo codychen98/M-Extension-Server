@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.animesource.online
 import eu.kanade.tachiyomi.animesource.AnimeCatalogueSource
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
+import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
@@ -335,6 +336,74 @@ abstract class AnimeHttpSource : AnimeCatalogueSource {
      * Sorts the video list. Override this according to the user's preference.
      */
     protected open fun List<Video>.sort(): List<Video> = this
+
+    /**
+     * Get the list of hosters for an episode.
+     *
+     * @since extensions-lib 16
+     */
+    override suspend fun getHosterList(episode: SEpisode): List<Hoster> =
+        client
+            .newCall(hosterListRequest(episode))
+            .awaitSuccess()
+            .let { hosterListParse(it) }
+
+    /**
+     * Returns the request for getting the hosters.
+     *
+     * @since extensions-lib 16
+     */
+    protected open fun hosterListRequest(episode: SEpisode): Request = GET(baseUrl + episode.url, headers)
+
+    /**
+     * Parses the response from the site and returns a list of hosters.
+     *
+     * @since extensions-lib 16
+     */
+    protected open fun hosterListParse(response: Response): List<Hoster> =
+        throw UnsupportedOperationException()
+
+    /**
+     * Get the list of videos for a hoster.
+     *
+     * @since extensions-lib 16
+     */
+    override suspend fun getVideoList(hoster: Hoster): List<Video> =
+        client
+            .newCall(videoListRequest(hoster))
+            .awaitSuccess()
+            .let { videoListParse(it, hoster) }
+
+    /**
+     * Returns the request for getting videos for a hoster.
+     *
+     * @since extensions-lib 16
+     */
+    protected open fun videoListRequest(hoster: Hoster): Request = GET(hoster.hosterUrl, headers)
+
+    /**
+     * Parses the response from the hoster and returns a list of videos.
+     *
+     * @since extensions-lib 16
+     */
+    protected open fun videoListParse(
+        response: Response,
+        hoster: Hoster,
+    ): List<Video> = throw UnsupportedOperationException()
+
+    /**
+     * Sorts the hoster list. Override this according to the user's preference.
+     *
+     * @since extensions-lib 16
+     */
+    open fun List<Hoster>.sortHosters(): List<Hoster> = this
+
+    /**
+     * Sorts the video list. Override this according to the user's preference.
+     *
+     * @since extensions-lib 16
+     */
+    open fun List<Video>.sortVideos(): List<Video> = this
 
     /**
      * Returns an observable with the page containing the source url of the image. If there's any
